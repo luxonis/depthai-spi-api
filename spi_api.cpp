@@ -54,7 +54,7 @@ SpiApi::~SpiApi(){
     free(spi_send_packet);
 }
 
-void SpiApi::set_send_spi_impl(uint8_t (*passed_send_spi)(char*)){
+void SpiApi::set_send_spi_impl(uint8_t (*passed_send_spi)(const char*)){
     send_spi_impl = passed_send_spi;
 }
 
@@ -62,7 +62,7 @@ void SpiApi::set_recv_spi_impl(uint8_t (*passed_recv_spi)(char*)){
     recv_spi_impl = passed_recv_spi;
 }
 
-uint8_t SpiApi::generic_send_spi(char* spi_send_packet){
+uint8_t SpiApi::generic_send_spi(const char* spi_send_packet){
     return (*send_spi_impl)(spi_send_packet); 
 }
 

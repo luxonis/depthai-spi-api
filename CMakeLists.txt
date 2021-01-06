@@ -1,7 +1,7 @@
 # Create library
 set(COMPONENT_SRCDIRS
     depthai-spi-library
-    depthai-spi-library/common
+    common
     depthai-shared/src/datatype
     .
 )
@@ -9,7 +9,7 @@ set(COMPONENT_SRCDIRS
 set(COMPONENT_ADD_INCLUDEDIRS  
     depthai-shared/include
     depthai-spi-library
-    depthai-spi-library/common
+    common
     .
 )
 
