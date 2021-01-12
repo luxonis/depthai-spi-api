@@ -33,7 +33,7 @@ struct Message {
 
 class SpiApi {
     private:
-        uint8_t (*send_spi_impl)(char* spi_send_packet);
+        uint8_t (*send_spi_impl)(const char* spi_send_packet);
         uint8_t (*recv_spi_impl)(char* recvbuf);
 
         void (*chunk_message_cb)(char* curr_packet, uint32_t chunk_size, uint32_t message_size);
@@ -41,7 +41,7 @@ class SpiApi {
         SpiProtocolInstance* spi_proto_instance;
         SpiProtocolPacket* spi_send_packet;
 
-        uint8_t generic_send_spi(char* spi_send_packet);
+        uint8_t generic_send_spi(const char* spi_send_packet);
         uint8_t generic_recv_spi(char* recvbuf);
         uint8_t spi_get_size(SpiGetSizeResp *response, spi_command get_size_cmd, const char * stream_name);
         uint8_t spi_get_message(SpiGetMessageResp *response, spi_command get_mess_cmd, const char * stream_name, uint32_t size);
@@ -54,7 +54,7 @@ class SpiApi {
         void debug_print_char(char * data, int len);
 
         // refs to callbacks
-        void set_send_spi_impl(uint8_t (*passed_send_spi)(char*));
+        void set_send_spi_impl(uint8_t (*passed_send_spi)(const char*));
         void set_recv_spi_impl(uint8_t (*passed_recv_spi)(char*));
 
         // base SPI API methods
