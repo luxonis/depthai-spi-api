@@ -150,6 +150,7 @@ uint8_t SpiApi::spi_get_message(SpiGetMessageResp *response, spi_command get_mes
         }
         success = 1;
     } else {
+        printf("full packet not received %d/%d!\n", total_recv, size);
         success = 0;
     }
 
@@ -157,6 +158,60 @@ uint8_t SpiApi::spi_get_message(SpiGetMessageResp *response, spi_command get_mes
 }
 
 
+
+uint8_t SpiApi::spi_get_message_partial(SpiGetMessageResp *response, const char * stream_name, uint32_t offset, uint32_t size){
+    uint8_t success = 0;
+    debug_cmd_print("sending GET_MESSAGE_PART cmd.\n");
+    spi_generate_command_partial(spi_send_packet, GET_MESSAGE_PART, strlen(stream_name)+1, stream_name, offset, size);
+    generic_send_spi((char*)spi_send_packet);
+
+    uint32_t total_recv = 0;
+    int debug_skip = 0;
+    while(total_recv < size){
+        if(debug_skip%20 == 0){
+            debug_cmd_print("receive GET_MESSAGE_PART response from remote device... %d/%d\n", total_recv, size);
+        }
+        debug_skip++;
+
+        char recvbuf[BUFF_MAX_SIZE] = {0};
+        uint8_t recv_success = generic_recv_spi(recvbuf);
+        if(recv_success){
+            if(recvbuf[0]==START_BYTE_MAGIC){
+                SpiProtocolPacket* spiRecvPacket = spi_protocol_parse(spi_proto_instance, (uint8_t*)recvbuf, sizeof(recvbuf));
+                uint32_t remaining_data = size-total_recv;
+                if ( remaining_data < PAYLOAD_MAX_SIZE ){
+                    memcpy(response->data+total_recv, spiRecvPacket->data, remaining_data);
+                    total_recv += remaining_data;
+                } else {
+                    memcpy(response->data+total_recv, spiRecvPacket->data, PAYLOAD_MAX_SIZE);
+                    total_recv += PAYLOAD_MAX_SIZE;
+                }
+
+            }else if(recvbuf[0] != 0x00){
+                printf("*************************************** got a half/non aa packet ************************************************\n");
+                break;
+            }
+        } else {
+            printf("failed to recv packet\n");
+            break;
+        }
+    }
+
+    if(total_recv==size){
+        spi_parse_get_message(response, size, GET_MESSAGE_PART);
+
+        if(DEBUG_MESSAGE_CONTENTS){
+            printf("data_size: %d\n", response->data_size);
+            debug_print_hex((uint8_t*)response->data, response->data_size);
+        }
+        success = 1;
+    } else {
+        printf("full packet not received %d/%d!\n", total_recv, size);
+        success = 0;
+    }
+
+    return success;
+}
 
 
 
@@ -273,7 +328,8 @@ uint8_t SpiApi::req_data(Data *requested_data, const char* stream_name){
     if(req_success){
         get_message_resp.data = (uint8_t*) malloc(get_size_resp.size);
         if(!get_message_resp.data){
-            printf("failed to allocate %d bytes", get_size_resp.size);
+            printf("failed to allocate %d bytes\n", get_size_resp.size);
+            return 0;
         }
 
         req_success = spi_get_message(&get_message_resp, GET_MESSAGE, stream_name, get_size_resp.size);
@@ -298,15 +354,47 @@ uint8_t SpiApi::req_metadata(Metadata *requested_data, const char* stream_name){
     // get message (assuming we got size)
     if(req_success){
         get_message_resp.data = (uint8_t*) malloc(get_size_resp.size);
-        if(!get_message_resp.data){
-            printf("failed to allocate %d bytes", get_size_resp.size);
+        if(get_message_resp.data){
+            req_success = spi_get_message(&get_message_resp, GET_METADATA, stream_name, get_size_resp.size);
+            if(req_success){
+                requested_data->data = get_message_resp.data;
+                requested_data->size = get_message_resp.data_size;
+                requested_data->type = (dai::DatatypeEnum) get_message_resp.data_type;
+            }
+        }else{
+            printf("failed to allocate %d bytes\n", get_size_resp.size);
+            req_success = 0;
         }
+    }
 
-        req_success = spi_get_message(&get_message_resp, GET_METADATA, stream_name, get_size_resp.size);
-        if(req_success){
-            requested_data->data = get_message_resp.data;
-            requested_data->size = get_message_resp.data_size;
-            requested_data->type = (dai::DatatypeEnum) get_message_resp.data_type;
+    return req_success;
+}
+
+uint8_t SpiApi::req_data_partial(Data *requested_data, const char* stream_name, uint32_t offset, uint32_t offset_size){
+    uint8_t req_success = 0;
+    SpiGetMessageResp get_message_resp;
+
+    SpiGetSizeResp get_size_resp;
+    req_success = spi_get_size(&get_size_resp, GET_SIZE, stream_name);
+    debug_cmd_print("response: %d\n", get_size_resp.size);
+
+    if(req_success){
+        // verify the specified part can be grabbed.
+        if(offset+offset_size <= get_size_resp.size){
+            get_message_resp.data = (uint8_t*) malloc(offset_size);
+            if(get_message_resp.data){
+                req_success = spi_get_message_partial(&get_message_resp, stream_name, offset, offset_size);
+                if(req_success){
+                    requested_data->data = get_message_resp.data;
+                    requested_data->size = get_message_resp.data_size;
+                }
+            } else {
+                printf("failed to allocate %d bytes\n", get_size_resp.size);
+                req_success = 0;
+            }
+        }else{
+            printf("requested data is out of bounds\n");
+            req_success = 0;
         }
     }
 
