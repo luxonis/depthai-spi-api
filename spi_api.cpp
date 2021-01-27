@@ -8,11 +8,7 @@
 
 #include "SpiPacketParser.hpp"
 
-#include "depthai-shared/datatype/DatatypeEnum.hpp"
-#include "depthai-shared/datatype/RawBuffer.hpp"
-#include "depthai-shared/datatype/RawImgFrame.hpp"
-#include "depthai-shared/datatype/RawNNData.hpp"
-#include "depthai-shared/datatype/RawImgDetections.hpp"
+
 
 #define DEBUG_CMD 0
 #define debug_cmd_print(...) \
@@ -516,6 +512,7 @@ void SpiApi::parse_metadata(Metadata *passed_metadata, T& parsed_return){
 template void SpiApi::parse_metadata(Metadata *passed_metadata, dai::RawNNData& parsed_return);
 template void SpiApi::parse_metadata(Metadata *passed_metadata, dai::RawImgFrame& parsed_return);
 template void SpiApi::parse_metadata(Metadata *passed_metadata, dai::RawImgDetections& parsed_return);
+template void SpiApi::parse_metadata(Metadata *passed_metadata, dai::RawDepthCalculatorData& parsed_return);
 
 
 
