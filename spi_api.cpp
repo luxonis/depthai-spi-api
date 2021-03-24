@@ -512,7 +512,7 @@ void SpiApi::parse_metadata(Metadata *passed_metadata, T& parsed_return){
 template void SpiApi::parse_metadata(Metadata *passed_metadata, dai::RawNNData& parsed_return);
 template void SpiApi::parse_metadata(Metadata *passed_metadata, dai::RawImgFrame& parsed_return);
 template void SpiApi::parse_metadata(Metadata *passed_metadata, dai::RawImgDetections& parsed_return);
-template void SpiApi::parse_metadata(Metadata *passed_metadata, dai::RawDepthCalculatorData& parsed_return);
+template void SpiApi::parse_metadata(Metadata *passed_metadata, dai::RawSpatialLocations& parsed_return);
 
 
 

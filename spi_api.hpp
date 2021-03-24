@@ -9,7 +9,7 @@
 #include "depthai-shared/datatype/RawImgFrame.hpp"
 #include "depthai-shared/datatype/RawNNData.hpp"
 #include "depthai-shared/datatype/RawImgDetections.hpp"
-#include "depthai-shared/datatype/RawDepthCalculatorData.hpp"
+#include "depthai-shared/datatype/RawSpatialLocations.hpp"
 
 namespace dai {
 static const char* NOSTREAM = "";
