@@ -5443,7 +5443,6 @@ class json_sax_dom_parser
     {
         errored = true;
         static_cast<void>(ex);
-printf("asdfasdf exception: %s\n", ex.what());
         if (allow_exceptions)
         {
             JSON_THROW(ex);

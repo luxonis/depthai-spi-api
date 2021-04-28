@@ -217,7 +217,9 @@ uint8_t SpiApi::spi_get_message_partial(SpiGetMessageResp *response, const char 
 
 
 
-
+//-----------------------------------------------------------------------------------------------------
+// public methods
+//-----------------------------------------------------------------------------------------------------
 uint8_t SpiApi::spi_pop_messages(){
     SpiStatusResp response;
     uint8_t success = 0;
@@ -312,6 +314,154 @@ std::vector<std::string> SpiApi::spi_get_streams(){
     }
 
     return streams;
+}
+
+
+//-----------------------------------------------------------------------------------------------------
+// public methods
+//-----------------------------------------------------------------------------------------------------
+
+void SpiApi::transfer(void* buffer, int size){
+
+    uint8_t* p_buffer = (uint8_t*) buffer;
+
+    //execute command
+    int maxPayloadSize = SPI_PROTOCOL_PAYLOAD_SIZE;
+
+    int numPackets = ( (size - 1) / maxPayloadSize) + 1;
+
+    // Get a pointer to packet
+    SpiProtocolPacket* packet = spi_send_packet;
+
+
+    for(int i = 0; i < numPackets; i++){
+        int toWrite = std::min(maxPayloadSize, size - (i*maxPayloadSize));
+        // Create a packet to transmit
+        auto ret = spi_protocol_write_packet(packet, p_buffer + i * maxPayloadSize, toWrite);
+        assert(ret == SPI_PROTOCOL_OK);
+
+        // Transmit the packet
+        printf("asdfasdf 3333333333333333333333333333333333333333 transfer: %d/%d\n", i, numPackets);
+//        debug_print_hex((uint8_t*)packet->data, toWrite);
+        generic_send_spi((char*)packet);
+    }
+}
+
+void SpiApi::transfer2(void* buffer1, void* buffer2, int size1, int size2){
+
+    uint8_t* p_buffer1 = (uint8_t*) buffer1;
+    uint8_t* p_buffer2 = (uint8_t*) buffer2;
+    int totalsize = size1 + size2;
+
+    //execute command
+    int maxPayloadSize = SPI_PROTOCOL_PAYLOAD_SIZE;
+
+    int numPackets = ( (totalsize - 1) / maxPayloadSize) + 1;
+
+    // Get a pointer to packet
+    SpiProtocolPacket* packet = spi_send_packet;
+
+    for(int i = 0; i < numPackets; i++){
+        int currOffset = i * maxPayloadSize;
+        int toWrite = std::min(maxPayloadSize, totalsize - (currOffset));
+
+        // case where we are sending from buffer1
+        if(currOffset + maxPayloadSize <= size1){
+            auto ret = spi_protocol_write_packet(packet, p_buffer1 + currOffset, toWrite);
+            assert(ret == SPI_PROTOCOL_OK);
+        // case where we are sending from both buffers
+        } else if(currOffset + maxPayloadSize > size1 && currOffset < size1) {
+            int buf1size = size1 - currOffset;
+            int buf2size = maxPayloadSize - buf1size;
+            auto ret = spi_protocol_write_packet2(packet, p_buffer1 + currOffset, p_buffer2, buf1size, buf2size);
+            assert(ret == SPI_PROTOCOL_OK);
+        // case where we are sending from buffer2
+        } else {
+            int currOffset2 = currOffset-size1;
+            auto ret = spi_protocol_write_packet(packet, p_buffer2 + currOffset2, toWrite);
+            assert(ret == SPI_PROTOCOL_OK);
+        }
+
+        // Transmit the packet
+        generic_send_spi((char*)packet);
+    }
+}
+
+uint8_t SpiApi::send_data(Data *sdata, const char* stream_name){
+    uint8_t req_success = 0;
+    SpiStatusResp response;
+
+    printf("asdfasdf 3333333333333333333333333333333333333333 running send_data\n");
+    spi_generate_command_send(spi_send_packet, SEND_DATA, strlen(stream_name)+1, stream_name, sdata->size);
+    generic_send_spi((char*)spi_send_packet);
+
+    char recvbuf[BUFF_MAX_SIZE] = {0};
+    uint8_t recv_success = generic_recv_spi(recvbuf);
+
+    // actually send the data.
+    if(recv_success){
+        if(recvbuf[0]==START_BYTE_MAGIC){
+            SpiProtocolPacket* spiRecvPacket = spi_protocol_parse(spi_proto_instance, (uint8_t*)recvbuf, sizeof(recvbuf));
+            spi_status_resp(&response, spiRecvPacket->data);
+            if(response.status == SPI_MSG_SUCCESS_RESP){
+                printf("asdfasdf 333333333333333333333333333333333333333333 should be sending data now...\n");
+                transfer(sdata->data, sdata->size);
+                req_success = 1;
+            }
+            
+        }else if(recvbuf[0] != 0x00){
+            printf("*************************************** got a half/non aa packet ************************************************\n");
+            req_success = 0;
+        }
+    } else {
+        printf("failed to recv packet\n");
+        req_success = 0;
+    }
+
+
+    return req_success;
+}
+
+
+uint8_t SpiApi::send_dai_message(const std::shared_ptr<RawBuffer>& sobject, const char* stream_name){
+    uint8_t req_success = 0;
+    SpiStatusResp response;
+    uint32_t total_send_size;
+
+    std::vector<uint8_t> footer = dai::serializeFooter(sobject);
+    total_send_size = footer.size() + sobject->data.size();
+    printf("asdfasdf 3333333333333333333333333333333333333333 running send_data %d\n", total_send_size);
+    
+
+    spi_generate_command_send(spi_send_packet, SEND_DATA, strlen(stream_name)+1, stream_name,  total_send_size);
+    generic_send_spi((char*)spi_send_packet);
+
+    char recvbuf[BUFF_MAX_SIZE] = {0};
+    uint8_t recv_success = generic_recv_spi(recvbuf);
+
+    // actually send the data.
+    if(recv_success){
+        // TODO: check for SPI_MSG_FAIL_RESP and don't send.
+        if(recvbuf[0]==START_BYTE_MAGIC){
+            SpiProtocolPacket* spiRecvPacket = spi_protocol_parse(spi_proto_instance, (uint8_t*)recvbuf, sizeof(recvbuf));
+            spi_status_resp(&response, spiRecvPacket->data);
+            if(response.status == SPI_MSG_SUCCESS_RESP){
+                printf("asdfasdf 333333333333333333333333333333333333333333 should be sending data now...\n");
+                transfer2((void*)&sobject->data[0], (void*)&footer[0], sobject->data.size(), footer.size());
+                req_success = 1;
+            }
+            
+        }else if(recvbuf[0] != 0x00){
+            printf("*************************************** got a half/non aa packet ************************************************\n");
+            req_success = 0;
+        }
+    } else {
+        printf("failed to recv packet\n");
+        req_success = 0;
+    }
+
+
+    return req_success;
 }
 
 

@@ -43,6 +43,10 @@ class SpiApi {
 
         uint8_t generic_send_spi(const char* spi_send_packet);
         uint8_t generic_recv_spi(char* recvbuf);
+
+        void transfer(void* buffer, int size);
+        void transfer2(void* buffer1, void* buffer2, int size1, int size2);
+
         uint8_t spi_get_size(SpiGetSizeResp *response, spi_command get_size_cmd, const char * stream_name);
         uint8_t spi_get_message(SpiGetMessageResp *response, spi_command get_mess_cmd, const char * stream_name, uint32_t size);
         uint8_t spi_get_message_partial(SpiGetMessageResp *response, const char * stream_name, uint32_t offset, uint32_t size);
@@ -66,6 +70,8 @@ class SpiApi {
         void free_message(Message* received_msg);
 
         // methods for requesting only metadata or data
+        uint8_t send_data(Data *send_data, const char* stream_name);
+        uint8_t send_dai_message(const std::shared_ptr<RawBuffer>& sobject, const char* stream_name);
         uint8_t req_data(Data *requested_data, const char* stream_name);
         uint8_t req_metadata(Metadata *requested_data, const char* stream_name);
         uint8_t req_data_partial(Data *requested_data, const char* stream_name, uint32_t offset, uint32_t offset_size);

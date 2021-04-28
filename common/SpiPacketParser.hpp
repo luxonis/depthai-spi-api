@@ -13,6 +13,7 @@ namespace dai {
 
 std::shared_ptr<RawBuffer> parseMetadata(uint8_t* metaPointer, int metaLength);
 std::vector<std::uint8_t> serializeData(const std::shared_ptr<RawBuffer>& data);
+std::vector<std::uint8_t> serializeFooter(const std::shared_ptr<RawBuffer>& data);
 
 DatatypeEnum parseDatatype(uint8_t* metaPointer, int metaLength);
 

@@ -73,7 +73,7 @@ std::shared_ptr<RawBuffer> parseMetadata(uint8_t* metaPointer, int metaLength) {
 
     return nullptr;
 }
-
+*/
 
 
 std::vector<std::uint8_t> serializeData(const std::shared_ptr<RawBuffer>& data) {
@@ -101,10 +101,41 @@ std::vector<std::uint8_t> serializeData(const std::shared_ptr<RawBuffer>& data) 
     ser.insert(ser.end(), metadata.begin(), metadata.end());
     ser.insert(ser.end(), leDatatype, leDatatype + sizeof(leDatatype));
     ser.insert(ser.end(), leMetadataSize, leMetadataSize + sizeof(leMetadataSize));
-
     return ser;
 }
-*/
+
+// this is a workaround to prevent using up the limited heap on the ESP32. The serializeData method makes two copies of the data.
+// We're essentially working around it by just generating the footer half of the packet and then concatinating it with the data half when sending.
+std::vector<std::uint8_t> serializeFooter(const std::shared_ptr<RawBuffer>& data) {
+    std::vector<std::uint8_t> ser;
+    if(!data) return ser;
+
+printf("serializeData bp1\n");
+
+    // Serialization:
+    // 1. serialize and append metadata
+    // 2. append datatype enum (4B LE)
+    // 3. append size (4B LE) of serialized metadata
+
+    std::vector<std::uint8_t> metadata;
+    DatatypeEnum datatype;
+    data->serialize(metadata, datatype);
+    uint32_t metadataSize = metadata.size();
+
+printf("serializeData bp2\n");
+    // 4B datatype & 4B metadata size
+    std::uint8_t leDatatype[4];
+    std::uint8_t leMetadataSize[4];
+    for(int i = 0; i < 4; i++) leDatatype[i] = (static_cast<std::int32_t>(datatype) >> (i * 8)) & 0xFF;
+    for(int i = 0; i < 4; i++) leMetadataSize[i] = (metadataSize >> i * 8) & 0xFF;
+
+printf("serializeData bp3\n");
+    ser.insert(ser.end(), metadata.begin(), metadata.end());
+    ser.insert(ser.end(), leDatatype, leDatatype + sizeof(leDatatype));
+    ser.insert(ser.end(), leMetadataSize, leMetadataSize + sizeof(leMetadataSize));
+printf("serializeData bp4\n");
+    return ser;
+}
 
 
 }  // namespace dai
