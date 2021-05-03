@@ -341,8 +341,6 @@ void SpiApi::transfer(void* buffer, int size){
         assert(ret == SPI_PROTOCOL_OK);
 
         // Transmit the packet
-        printf("asdfasdf 3333333333333333333333333333333333333333 transfer: %d/%d\n", i, numPackets);
-//        debug_print_hex((uint8_t*)packet->data, toWrite);
         generic_send_spi((char*)packet);
     }
 }
@@ -391,7 +389,6 @@ uint8_t SpiApi::send_data(Data *sdata, const char* stream_name){
     uint8_t req_success = 0;
     SpiStatusResp response;
 
-    printf("asdfasdf 3333333333333333333333333333333333333333 running send_data\n");
     spi_generate_command_send(spi_send_packet, SEND_DATA, strlen(stream_name)+1, stream_name, sdata->size);
     generic_send_spi((char*)spi_send_packet);
 
@@ -404,7 +401,6 @@ uint8_t SpiApi::send_data(Data *sdata, const char* stream_name){
             SpiProtocolPacket* spiRecvPacket = spi_protocol_parse(spi_proto_instance, (uint8_t*)recvbuf, sizeof(recvbuf));
             spi_status_resp(&response, spiRecvPacket->data);
             if(response.status == SPI_MSG_SUCCESS_RESP){
-                printf("asdfasdf 333333333333333333333333333333333333333333 should be sending data now...\n");
                 transfer(sdata->data, sdata->size);
                 req_success = 1;
             }
@@ -430,8 +426,6 @@ uint8_t SpiApi::send_dai_message(const std::shared_ptr<RawBuffer>& sobject, cons
 
     std::vector<uint8_t> footer = dai::serializeFooter(sobject);
     total_send_size = footer.size() + sobject->data.size();
-    printf("asdfasdf 3333333333333333333333333333333333333333 running send_data %d\n", total_send_size);
-    
 
     spi_generate_command_send(spi_send_packet, SEND_DATA, strlen(stream_name)+1, stream_name,  total_send_size);
     generic_send_spi((char*)spi_send_packet);
@@ -446,7 +440,6 @@ uint8_t SpiApi::send_dai_message(const std::shared_ptr<RawBuffer>& sobject, cons
             SpiProtocolPacket* spiRecvPacket = spi_protocol_parse(spi_proto_instance, (uint8_t*)recvbuf, sizeof(recvbuf));
             spi_status_resp(&response, spiRecvPacket->data);
             if(response.status == SPI_MSG_SUCCESS_RESP){
-                printf("asdfasdf 333333333333333333333333333333333333333333 should be sending data now...\n");
                 transfer2((void*)&sobject->data[0], (void*)&footer[0], sobject->data.size(), footer.size());
                 req_success = 1;
             }
