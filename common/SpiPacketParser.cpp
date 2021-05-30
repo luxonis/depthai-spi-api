@@ -14,6 +14,7 @@
 #include "depthai-shared/datatype/RawImgFrame.hpp"
 #include "depthai-shared/datatype/RawNNData.hpp"
 #include "depthai-shared/datatype/RawImgDetections.hpp"
+#include "depthai-shared/datatype/RawTracklets.hpp"
 
 
 // StreamPacket structure ->  || imgframepixels... , serialized_object, object_type, serialized_object_size ||
