@@ -514,7 +514,7 @@ template void SpiApi::parse_metadata(Metadata *passed_metadata, dai::RawImgFrame
 template void SpiApi::parse_metadata(Metadata *passed_metadata, dai::RawImgDetections& parsed_return);
 template void SpiApi::parse_metadata(Metadata *passed_metadata, dai::RawSpatialImgDetections& parsed_return);
 template void SpiApi::parse_metadata(Metadata *passed_metadata, dai::RawSpatialLocations& parsed_return);
-
+template void SpiApi::parse_metadata(Metadata *passed_metadata, dai::RawTracklets& parsed_return);
 
 
 }  // namespace dai

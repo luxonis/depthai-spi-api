@@ -11,6 +11,7 @@
 #include "depthai-shared/datatype/RawImgDetections.hpp"
 #include "depthai-shared/datatype/RawSpatialImgDetections.hpp"
 #include "depthai-shared/datatype/RawSpatialLocations.hpp"
+#include "depthai-shared/datatype/RawTracklets.hpp"
 
 namespace dai {
 static const char* NOSTREAM = "";
