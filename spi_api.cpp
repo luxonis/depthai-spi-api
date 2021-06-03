@@ -509,11 +509,12 @@ void SpiApi::parse_metadata(Metadata *passed_metadata, T& parsed_return){
 }
 
 // Explicit template instantiation
-template void SpiApi::parse_metadata(Metadata *passed_metadata, dai::RawNNData& parsed_return);
-template void SpiApi::parse_metadata(Metadata *passed_metadata, dai::RawImgFrame& parsed_return);
 template void SpiApi::parse_metadata(Metadata *passed_metadata, dai::RawImgDetections& parsed_return);
+template void SpiApi::parse_metadata(Metadata *passed_metadata, dai::RawImgFrame& parsed_return);
+template void SpiApi::parse_metadata(Metadata *passed_metadata, dai::RawNNData& parsed_return);
 template void SpiApi::parse_metadata(Metadata *passed_metadata, dai::RawSpatialImgDetections& parsed_return);
 template void SpiApi::parse_metadata(Metadata *passed_metadata, dai::RawSpatialLocations& parsed_return);
+template void SpiApi::parse_metadata(Metadata *passed_metadata, dai::RawSystemInformation& parsed_return);
 template void SpiApi::parse_metadata(Metadata *passed_metadata, dai::RawTracklets& parsed_return);
 
 

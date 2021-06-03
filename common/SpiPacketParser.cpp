@@ -11,9 +11,12 @@
 // shared
 #include "depthai-shared/datatype/DatatypeEnum.hpp"
 #include "depthai-shared/datatype/RawBuffer.hpp"
+#include "depthai-shared/datatype/RawImgDetections.hpp"
 #include "depthai-shared/datatype/RawImgFrame.hpp"
 #include "depthai-shared/datatype/RawNNData.hpp"
-#include "depthai-shared/datatype/RawImgDetections.hpp"
+#include "depthai-shared/datatype/RawSpatialImgDetections.hpp"
+#include "depthai-shared/datatype/RawSpatialLocations.hpp"
+#include "depthai-shared/datatype/RawSystemInformation.hpp"
 #include "depthai-shared/datatype/RawTracklets.hpp"
 
 
