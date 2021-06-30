@@ -5,6 +5,7 @@
 #include "spi_protocol.h"
 
 #include "depthai-shared/datatype/DatatypeEnum.hpp"
+// TODO - unneeded, preferably move to a common include
 #include "depthai-shared/datatype/RawBuffer.hpp"
 #include "depthai-shared/datatype/RawImgFrame.hpp"
 #include "depthai-shared/datatype/RawNNData.hpp"
@@ -73,9 +74,16 @@ class SpiApi {
         uint8_t req_metadata(Metadata *requested_data, const char* stream_name);
         uint8_t req_data_partial(Data *requested_data, const char* stream_name, uint32_t offset, uint32_t offset_size);
 
+        template<typename MSG>
+        void parse_message(const uint8_t* meta_pointer, int meta_length, MSG& obj){
+            nlohmann::json jser = nlohmann::json::from_msgpack(metaPointer, metaPointer + (metaLength));
+            nlohmann::from_json(jser, obj);
+        }
 
-        template<typename TYPE>
-        void parse_metadata(Metadata *passed_metadata, TYPE& parsed_return);
+        template<typename MSG>
+        void SpiApi::parse_metadata(Metadata *passed_metadata, MSG& parsed_return){
+            parse_message(passed_metadata->data, passed_metadata->size, parsed_return);
+        }
 
         // methods for receiving a large message piece by piece
         void chunk_message(const char* stream_name);

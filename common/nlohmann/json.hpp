@@ -30,6 +30,10 @@ SOFTWARE.
 #ifndef INCLUDE_NLOHMANN_JSON_HPP_
 #define INCLUDE_NLOHMANN_JSON_HPP_
 
+// B1 redefinition circumvent
+#pragma push_macro("B1")
+#undef B1
+
 #define NLOHMANN_JSON_VERSION_MAJOR 3
 #define NLOHMANN_JSON_VERSION_MINOR 9
 #define NLOHMANN_JSON_VERSION_PATCH 1
@@ -25443,6 +25447,7 @@ inline nlohmann::json::json_pointer operator "" _json_pointer(const char* s, std
 #undef JSON_HEDLEY_WARN_UNUSED_RESULT_MSG
 #undef JSON_HEDLEY_FALL_THROUGH
 
-
+// B1 redefinition circumvent
+#pragma pop_macro("B1")
 
 #endif  // INCLUDE_NLOHMANN_JSON_HPP_
