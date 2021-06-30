@@ -1,14 +1,10 @@
-#include <stdio.h>
-#include <stdint.h>
-#include <stddef.h>
-#include <string.h>
-#include <cassert>
-
 #include "spi_api.hpp"
 
-#include "SpiPacketParser.hpp"
-
-
+#include <cstdio>
+#include <cstdint>
+#include <cstddef>
+#include <cstring>
+#include <cassert>
 
 #define DEBUG_CMD 0
 #define debug_cmd_print(...) \
