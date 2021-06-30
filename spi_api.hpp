@@ -77,12 +77,12 @@ class SpiApi {
 
         template<typename MSG>
         void parse_message(const uint8_t* meta_pointer, int meta_length, MSG& obj){
-            nlohmann::json jser = nlohmann::json::from_msgpack(metaPointer, metaPointer + (metaLength));
+            nlohmann::json jser = nlohmann::json::from_msgpack(meta_pointer, meta_pointer + (meta_length));
             nlohmann::from_json(jser, obj);
         }
 
         template<typename MSG>
-        void SpiApi::parse_metadata(Metadata *passed_metadata, MSG& parsed_return){
+        void parse_metadata(Metadata *passed_metadata, MSG& parsed_return){
             parse_message(passed_metadata->data, passed_metadata->size, parsed_return);
         }
 
