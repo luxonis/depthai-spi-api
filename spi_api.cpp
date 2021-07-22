@@ -1,18 +1,10 @@
-#include <stdio.h>
-#include <stdint.h>
-#include <stddef.h>
-#include <string.h>
-#include <cassert>
-
 #include "spi_api.hpp"
 
-#include "SpiPacketParser.hpp"
-
-#include "depthai-shared/datatype/DatatypeEnum.hpp"
-#include "depthai-shared/datatype/RawBuffer.hpp"
-#include "depthai-shared/datatype/RawImgFrame.hpp"
-#include "depthai-shared/datatype/RawNNData.hpp"
-#include "depthai-shared/datatype/RawImgDetections.hpp"
+#include <cstdio>
+#include <cstdint>
+#include <cstddef>
+#include <cstring>
+#include <cassert>
 
 #define DEBUG_CMD 0
 #define debug_cmd_print(...) \
@@ -63,7 +55,7 @@ void SpiApi::set_recv_spi_impl(uint8_t (*passed_recv_spi)(char*)){
 }
 
 uint8_t SpiApi::generic_send_spi(const char* spi_send_packet){
-    return (*send_spi_impl)(spi_send_packet); 
+    return (*send_spi_impl)(spi_send_packet);
 }
 
 uint8_t SpiApi::generic_recv_spi(char* recvbuf){
@@ -87,7 +79,7 @@ uint8_t SpiApi::spi_get_size(SpiGetSizeResp *response, spi_command get_size_cmd,
             SpiProtocolPacket* spiRecvPacket = spi_protocol_parse(spi_proto_instance, (uint8_t*)recvbuf, sizeof(recvbuf));
             spi_parse_get_size_resp(response, spiRecvPacket->data);
             success = 1;
-            
+
         }else if(recvbuf[0] != 0x00){
             printf("*************************************** got a half/non aa packet ************************************************\n");
             success = 0;
@@ -239,7 +231,7 @@ uint8_t SpiApi::spi_pop_messages(){
             if(response.status == SPI_MSG_SUCCESS_RESP){
                 success = 1;
             }
-            
+
         }else if(recvbuf[0] != 0x00){
             printf("*************************************** got a half/non aa packet ************************************************\n");
             success = 0;
@@ -271,7 +263,7 @@ uint8_t SpiApi::spi_pop_message(const char * stream_name){
             if(response.status == SPI_MSG_SUCCESS_RESP){
                 success = 1;
             }
-            
+
         }else if(recvbuf[0] != 0x00){
             printf("*************************************** got a half/non aa packet ************************************************\n");
             success = 0;
@@ -301,7 +293,7 @@ std::vector<std::string> SpiApi::spi_get_streams(){
             SpiProtocolPacket* spiRecvPacket = spi_protocol_parse(spi_proto_instance, (uint8_t*)recvbuf, sizeof(recvbuf));
             spi_parse_get_streams_resp(&response, spiRecvPacket->data);
 
-            std::string currStr;            
+            std::string currStr;
             for(int i=0; i<response.numStreams; i++){
                 currStr = response.stream_names[i];
                 streams.push_back(currStr);
@@ -568,7 +560,7 @@ uint8_t SpiApi::req_message(Message* received_msg, const char* stream_name){
     // the req_metadata method allocates memory for the received packet. we need to be sure to free it when we're done with it.
     req_meta_success = req_metadata(&raw_meta, stream_name);
 
-    
+
     if(req_data_success && req_meta_success){
         received_msg->raw_data = raw_data;
         received_msg->raw_meta = raw_meta;
@@ -642,25 +634,6 @@ void SpiApi::chunk_message(const char* stream_name){
         }
     }
 }
-
-
-template<typename T>
-void parseMessage(uint8_t* metaPointer, int metaLength, T& obj){
-    nlohmann::json jser = nlohmann::json::from_msgpack(metaPointer, metaPointer + (metaLength));
-    nlohmann::from_json(jser, obj);
-}
-
-template<typename T>
-void SpiApi::parse_metadata(Metadata *passed_metadata, T& parsed_return){
-    dai::parseMessage(passed_metadata->data, passed_metadata->size, parsed_return);
-}
-
-// Explicit template instantiation
-template void SpiApi::parse_metadata(Metadata *passed_metadata, dai::RawNNData& parsed_return);
-template void SpiApi::parse_metadata(Metadata *passed_metadata, dai::RawImgFrame& parsed_return);
-template void SpiApi::parse_metadata(Metadata *passed_metadata, dai::RawImgDetections& parsed_return);
-
-
 
 }  // namespace dai
 
