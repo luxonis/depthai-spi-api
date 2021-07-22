@@ -424,10 +424,10 @@ bool SpiApi::send_message(const RawBuffer& msg, const char* stream_name){
     SpiStatusResp response;
     uint32_t total_send_size;
 
-    std::vector<uint8_t> footer = serialize_metadata(msg);
-    total_send_size = footer.size() + msg.data.size();
+    std::vector<uint8_t> metadata = serialize_metadata(msg);
+    total_send_size = metadata.size() + msg.data.size();
 
-    spi_generate_command_send(spi_send_packet, SEND_DATA, strlen(stream_name)+1, stream_name,  total_send_size);
+    spi_generate_command_send(spi_send_packet, SEND_DATA, strlen(stream_name)+1, stream_name, metadata.size(), total_send_size);
     generic_send_spi((char*)spi_send_packet);
 
     char recvbuf[BUFF_MAX_SIZE] = {0};
@@ -440,7 +440,7 @@ bool SpiApi::send_message(const RawBuffer& msg, const char* stream_name){
             SpiProtocolPacket* spiRecvPacket = spi_protocol_parse(spi_proto_instance, (uint8_t*)recvbuf, sizeof(recvbuf));
             spi_status_resp(&response, spiRecvPacket->data);
             if(response.status == SPI_MSG_SUCCESS_RESP){
-                transfer2((void*)&msg.data[0], (void*)&footer[0], msg.data.size(), footer.size());
+                transfer2((void*)&msg.data[0], (void*)&metadata[0], msg.data.size(), metadata.size());
                 req_success = true;
             }
 
