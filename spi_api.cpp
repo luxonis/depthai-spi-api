@@ -14,6 +14,9 @@
 
 namespace dai {
 
+// static function definitions
+static std::vector<std::uint8_t> serialize_metadata(const RawBuffer& msg);
+
 void SpiApi::debug_print_hex(uint8_t * data, int len){
     for(int i=0; i<len; i++){
         if(i%80==0){
@@ -396,7 +399,7 @@ uint8_t SpiApi::send_data(Data *sdata, const char* stream_name){
                 transfer(sdata->data, sdata->size);
                 req_success = 1;
             }
-            
+
         }else if(recvbuf[0] != 0x00){
             printf("*************************************** got a half/non aa packet ************************************************\n");
             req_success = 0;
@@ -411,13 +414,18 @@ uint8_t SpiApi::send_data(Data *sdata, const char* stream_name){
 }
 
 
-uint8_t SpiApi::send_dai_message(const std::shared_ptr<RawBuffer>& sobject, const char* stream_name){
-    uint8_t req_success = 0;
+
+bool SpiApi::send_message(const std::shared_ptr<RawBuffer>& sp_msg, const char* stream_name){
+    return send_message(*sp_msg, stream_name);
+}
+
+bool SpiApi::send_message(const RawBuffer& msg, const char* stream_name){
+    bool req_success = false;
     SpiStatusResp response;
     uint32_t total_send_size;
 
-    std::vector<uint8_t> footer = dai::serializeFooter(sobject);
-    total_send_size = footer.size() + sobject->data.size();
+    std::vector<uint8_t> footer = serialize_metadata(msg);
+    total_send_size = footer.size() + msg.data.size();
 
     spi_generate_command_send(spi_send_packet, SEND_DATA, strlen(stream_name)+1, stream_name,  total_send_size);
     generic_send_spi((char*)spi_send_packet);
@@ -432,17 +440,17 @@ uint8_t SpiApi::send_dai_message(const std::shared_ptr<RawBuffer>& sobject, cons
             SpiProtocolPacket* spiRecvPacket = spi_protocol_parse(spi_proto_instance, (uint8_t*)recvbuf, sizeof(recvbuf));
             spi_status_resp(&response, spiRecvPacket->data);
             if(response.status == SPI_MSG_SUCCESS_RESP){
-                transfer2((void*)&sobject->data[0], (void*)&footer[0], sobject->data.size(), footer.size());
-                req_success = 1;
+                transfer2((void*)&msg.data[0], (void*)&footer[0], msg.data.size(), footer.size());
+                req_success = true;
             }
-            
+
         }else if(recvbuf[0] != 0x00){
             printf("*************************************** got a half/non aa packet ************************************************\n");
-            req_success = 0;
+            req_success = false;
         }
     } else {
         printf("failed to recv packet\n");
-        req_success = 0;
+        req_success = false;
     }
 
 
@@ -634,6 +642,35 @@ void SpiApi::chunk_message(const char* stream_name){
         }
     }
 }
+
+// Static functions
+
+// Serialize only metadata into a separate vector
+std::vector<std::uint8_t> serialize_metadata(const RawBuffer& msg) {
+    std::vector<std::uint8_t> ser;
+
+    // Serialization:
+    // 1. serialize and append metadata
+    // 2. append datatype enum (4B LE)
+    // 3. append size (4B LE) of serialized metadata
+
+    std::vector<std::uint8_t> metadata;
+    DatatypeEnum datatype;
+    msg.serialize(metadata, datatype);
+    uint32_t metadataSize = metadata.size();
+
+    // 4B datatype & 4B metadata size
+    std::uint8_t leDatatype[4];
+    std::uint8_t leMetadataSize[4];
+    for(int i = 0; i < 4; i++) leDatatype[i] = (static_cast<std::int32_t>(datatype) >> (i * 8)) & 0xFF;
+    for(int i = 0; i < 4; i++) leMetadataSize[i] = (metadataSize >> i * 8) & 0xFF;
+
+    ser.insert(ser.end(), metadata.begin(), metadata.end());
+    ser.insert(ser.end(), leDatatype, leDatatype + sizeof(leDatatype));
+    ser.insert(ser.end(), leMetadataSize, leMetadataSize + sizeof(leMetadataSize));
+    return ser;
+}
+
 
 }  // namespace dai
 

@@ -16,6 +16,7 @@
 #include "depthai-shared/datatype/RawTracklets.hpp"
 
 namespace dai {
+
 static const char* NOSTREAM = "";
 
 struct Data {
@@ -76,11 +77,12 @@ class SpiApi {
 
         // methods for requesting only metadata or data
         uint8_t send_data(Data *send_data, const char* stream_name);
-        uint8_t send_dai_message(const std::shared_ptr<RawBuffer>& sobject, const char* stream_name);
         uint8_t req_data(Data *requested_data, const char* stream_name);
         uint8_t req_metadata(Metadata *requested_data, const char* stream_name);
         uint8_t req_data_partial(Data *requested_data, const char* stream_name, uint32_t offset, uint32_t offset_size);
 
+        // High level message functions
+        // Receiving
         template<typename MSG>
         void parse_message(const uint8_t* meta_pointer, int meta_length, MSG& obj){
             nlohmann::json jser = nlohmann::json::from_msgpack(meta_pointer, meta_pointer + (meta_length));
@@ -95,6 +97,11 @@ class SpiApi {
         // methods for receiving a large message piece by piece
         void chunk_message(const char* stream_name);
         void set_chunk_packet_cb(void (*passed_chunk_message_cb)(char*, uint32_t, uint32_t));
+
+        // Sending
+        bool send_message(const std::shared_ptr<RawBuffer>& sp_msg, const char* stream_name);
+        bool send_message(const RawBuffer& msg, const char* stream_name);
+
 };
 
 
