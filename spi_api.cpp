@@ -14,6 +14,9 @@
 
 namespace dai {
 
+// static function definitions
+static std::vector<std::uint8_t> serialize_metadata(const RawBuffer& msg);
+
 void SpiApi::debug_print_hex(uint8_t * data, int len){
     for(int i=0; i<len; i++){
         if(i%80==0){
@@ -209,7 +212,9 @@ uint8_t SpiApi::spi_get_message_partial(SpiGetMessageResp *response, const char 
 
 
 
-
+//-----------------------------------------------------------------------------------------------------
+// public methods
+//-----------------------------------------------------------------------------------------------------
 uint8_t SpiApi::spi_pop_messages(){
     SpiStatusResp response;
     uint8_t success = 0;
@@ -304,6 +309,152 @@ std::vector<std::string> SpiApi::spi_get_streams(){
     }
 
     return streams;
+}
+
+
+//-----------------------------------------------------------------------------------------------------
+// public methods
+//-----------------------------------------------------------------------------------------------------
+
+void SpiApi::transfer(const void* buffer, int size){
+
+    const uint8_t* p_buffer = (const uint8_t*) buffer;
+
+    //execute command
+    int maxPayloadSize = SPI_PROTOCOL_PAYLOAD_SIZE;
+
+    int numPackets = ( (size - 1) / maxPayloadSize) + 1;
+
+    // Get a pointer to packet
+    SpiProtocolPacket* packet = spi_send_packet;
+
+
+    for(int i = 0; i < numPackets; i++){
+        int toWrite = std::min(maxPayloadSize, size - (i*maxPayloadSize));
+        // Create a packet to transmit
+        auto ret = spi_protocol_write_packet(packet, p_buffer + i * maxPayloadSize, toWrite);
+        assert(ret == SPI_PROTOCOL_OK);
+
+        // Transmit the packet
+        generic_send_spi((char*)packet);
+    }
+}
+
+void SpiApi::transfer2(const void* buffer1, const void* buffer2, int size1, int size2){
+
+    const uint8_t* p_buffer1 = (const uint8_t*) buffer1;
+    const uint8_t* p_buffer2 = (const uint8_t*) buffer2;
+    int totalsize = size1 + size2;
+
+    //execute command
+    int maxPayloadSize = SPI_PROTOCOL_PAYLOAD_SIZE;
+
+    int numPackets = ( (totalsize - 1) / maxPayloadSize) + 1;
+
+    // Get a pointer to packet
+    SpiProtocolPacket* packet = spi_send_packet;
+
+    for(int i = 0; i < numPackets; i++){
+        int currOffset = i * maxPayloadSize;
+        int toWrite = std::min(maxPayloadSize, totalsize - (currOffset));
+
+        // case where we are sending from buffer1
+        if(currOffset + maxPayloadSize <= size1){
+            auto ret = spi_protocol_write_packet(packet, p_buffer1 + currOffset, toWrite);
+            assert(ret == SPI_PROTOCOL_OK);
+        // case where we are sending from both buffers
+        } else if(currOffset + maxPayloadSize > size1 && currOffset < size1) {
+            int buf1size = size1 - currOffset;
+            int buf2size = maxPayloadSize - buf1size;
+            auto ret = spi_protocol_write_packet2(packet, p_buffer1 + currOffset, p_buffer2, buf1size, buf2size);
+            assert(ret == SPI_PROTOCOL_OK);
+        // case where we are sending from buffer2
+        } else {
+            int currOffset2 = currOffset-size1;
+            auto ret = spi_protocol_write_packet(packet, p_buffer2 + currOffset2, toWrite);
+            assert(ret == SPI_PROTOCOL_OK);
+        }
+
+        // Transmit the packet
+        generic_send_spi((char*)packet);
+    }
+}
+
+uint8_t SpiApi::send_data(Data *sdata, const char* stream_name){
+    uint8_t req_success = 0;
+    SpiStatusResp response;
+
+    spi_generate_command_send(spi_send_packet, SEND_DATA, strlen(stream_name)+1, stream_name, 0, sdata->size);
+    generic_send_spi((char*)spi_send_packet);
+
+    char recvbuf[BUFF_MAX_SIZE] = {0};
+    uint8_t recv_success = generic_recv_spi(recvbuf);
+
+    // actually send the data.
+    if(recv_success){
+        if(recvbuf[0]==START_BYTE_MAGIC){
+            SpiProtocolPacket* spiRecvPacket = spi_protocol_parse(spi_proto_instance, (uint8_t*)recvbuf, sizeof(recvbuf));
+            spi_status_resp(&response, spiRecvPacket->data);
+            if(response.status == SPI_MSG_SUCCESS_RESP){
+                transfer(sdata->data, sdata->size);
+                req_success = 1;
+            }
+
+        }else if(recvbuf[0] != 0x00){
+            printf("*************************************** got a half/non aa packet ************************************************\n");
+            req_success = 0;
+        }
+    } else {
+        printf("failed to recv packet\n");
+        req_success = 0;
+    }
+
+
+    return req_success;
+}
+
+
+
+bool SpiApi::send_message(const std::shared_ptr<RawBuffer>& sp_msg, const char* stream_name){
+    return send_message(*sp_msg, stream_name);
+}
+
+bool SpiApi::send_message(const RawBuffer& msg, const char* stream_name){
+    bool req_success = false;
+    SpiStatusResp response;
+    uint32_t total_send_size;
+
+    std::vector<uint8_t> metadata = serialize_metadata(msg);
+    total_send_size = metadata.size() + msg.data.size();
+
+    spi_generate_command_send(spi_send_packet, SEND_DATA, strlen(stream_name)+1, stream_name, metadata.size(), total_send_size);
+    generic_send_spi((char*)spi_send_packet);
+
+    char recvbuf[BUFF_MAX_SIZE] = {0};
+    uint8_t recv_success = generic_recv_spi(recvbuf);
+
+    // actually send the data.
+    if(recv_success){
+        // TODO: check for SPI_MSG_FAIL_RESP and don't send.
+        if(recvbuf[0]==START_BYTE_MAGIC){
+            SpiProtocolPacket* spiRecvPacket = spi_protocol_parse(spi_proto_instance, (uint8_t*)recvbuf, sizeof(recvbuf));
+            spi_status_resp(&response, spiRecvPacket->data);
+            if(response.status == SPI_MSG_SUCCESS_RESP){
+                transfer2(msg.data.data(), metadata.data(), msg.data.size(), metadata.size());
+                req_success = true;
+            }
+
+        }else if(recvbuf[0] != 0x00){
+            printf("*************************************** got a half/non aa packet ************************************************\n");
+            req_success = false;
+        }
+    } else {
+        printf("failed to recv packet\n");
+        req_success = false;
+    }
+
+
+    return req_success;
 }
 
 
@@ -491,6 +642,35 @@ void SpiApi::chunk_message(const char* stream_name){
         }
     }
 }
+
+// Static functions
+
+// Serialize only metadata into a separate vector
+std::vector<std::uint8_t> serialize_metadata(const RawBuffer& msg) {
+    std::vector<std::uint8_t> ser;
+
+    // Serialization:
+    // 1. serialize and append metadata
+    // 2. append datatype enum (4B LE)
+    // 3. append size (4B LE) of serialized metadata
+
+    std::vector<std::uint8_t> metadata;
+    DatatypeEnum datatype;
+    msg.serialize(metadata, datatype);
+    uint32_t metadataSize = metadata.size();
+
+    // 4B datatype & 4B metadata size
+    std::uint8_t leDatatype[4];
+    std::uint8_t leMetadataSize[4];
+    for(int i = 0; i < 4; i++) leDatatype[i] = (static_cast<std::int32_t>(datatype) >> (i * 8)) & 0xFF;
+    for(int i = 0; i < 4; i++) leMetadataSize[i] = (metadataSize >> i * 8) & 0xFF;
+
+    ser.insert(ser.end(), metadata.begin(), metadata.end());
+    ser.insert(ser.end(), leDatatype, leDatatype + sizeof(leDatatype));
+    ser.insert(ser.end(), leMetadataSize, leMetadataSize + sizeof(leMetadataSize));
+    return ser;
+}
+
 
 }  // namespace dai
 
