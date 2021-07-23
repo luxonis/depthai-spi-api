@@ -316,9 +316,9 @@ std::vector<std::string> SpiApi::spi_get_streams(){
 // public methods
 //-----------------------------------------------------------------------------------------------------
 
-void SpiApi::transfer(void* buffer, int size){
+void SpiApi::transfer(const void* buffer, int size){
 
-    uint8_t* p_buffer = (uint8_t*) buffer;
+    const uint8_t* p_buffer = (const uint8_t*) buffer;
 
     //execute command
     int maxPayloadSize = SPI_PROTOCOL_PAYLOAD_SIZE;
@@ -340,10 +340,10 @@ void SpiApi::transfer(void* buffer, int size){
     }
 }
 
-void SpiApi::transfer2(void* buffer1, void* buffer2, int size1, int size2){
+void SpiApi::transfer2(const void* buffer1, const void* buffer2, int size1, int size2){
 
-    uint8_t* p_buffer1 = (uint8_t*) buffer1;
-    uint8_t* p_buffer2 = (uint8_t*) buffer2;
+    const uint8_t* p_buffer1 = (const uint8_t*) buffer1;
+    const uint8_t* p_buffer2 = (const uint8_t*) buffer2;
     int totalsize = size1 + size2;
 
     //execute command
@@ -384,7 +384,7 @@ uint8_t SpiApi::send_data(Data *sdata, const char* stream_name){
     uint8_t req_success = 0;
     SpiStatusResp response;
 
-    spi_generate_command_send(spi_send_packet, SEND_DATA, strlen(stream_name)+1, stream_name, sdata->size);
+    spi_generate_command_send(spi_send_packet, SEND_DATA, strlen(stream_name)+1, stream_name, 0, sdata->size);
     generic_send_spi((char*)spi_send_packet);
 
     char recvbuf[BUFF_MAX_SIZE] = {0};
@@ -440,7 +440,7 @@ bool SpiApi::send_message(const RawBuffer& msg, const char* stream_name){
             SpiProtocolPacket* spiRecvPacket = spi_protocol_parse(spi_proto_instance, (uint8_t*)recvbuf, sizeof(recvbuf));
             spi_status_resp(&response, spiRecvPacket->data);
             if(response.status == SPI_MSG_SUCCESS_RESP){
-                transfer2((void*)&msg.data[0], (void*)&metadata[0], msg.data.size(), metadata.size());
+                transfer2(msg.data.data(), metadata.data(), msg.data.size(), metadata.size());
                 req_success = true;
             }
 

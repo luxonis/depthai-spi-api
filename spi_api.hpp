@@ -50,8 +50,8 @@ class SpiApi {
         uint8_t generic_send_spi(const char* spi_send_packet);
         uint8_t generic_recv_spi(char* recvbuf);
 
-        void transfer(void* buffer, int size);
-        void transfer2(void* buffer1, void* buffer2, int size1, int size2);
+        void transfer(const void* buffer, int size);
+        void transfer2(const void* buffer1, const void* buffer2, int size1, int size2);
 
         uint8_t spi_get_size(SpiGetSizeResp *response, spi_command get_size_cmd, const char * stream_name);
         uint8_t spi_get_message(SpiGetMessageResp *response, spi_command get_mess_cmd, const char * stream_name, uint32_t size);
