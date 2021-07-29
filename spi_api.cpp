@@ -6,7 +6,7 @@
 #include <cstring>
 #include <cassert>
 
-#define DEBUG_CMD 0
+#define DEBUG_CMD 1
 #define debug_cmd_print(...) \
     do { if (DEBUG_CMD) fprintf(stderr, __VA_ARGS__); } while (0)
 
@@ -465,21 +465,26 @@ uint8_t SpiApi::req_data(Data *requested_data, const char* stream_name){
     // do a get_size before trying to retreive message.
     SpiGetSizeResp get_size_resp;
     req_success = spi_get_size(&get_size_resp, GET_SIZE, stream_name);
-    debug_cmd_print("response: %d\n", get_size_resp.size);
+    debug_cmd_print("req_data | spi_get_size response: %d, ret: %d\n", get_size_resp.size, req_success);
 
     // get message (assuming we got size)
     if(req_success){
-        get_message_resp.data = (uint8_t*) malloc(get_size_resp.size);
-        if(!get_message_resp.data){
-            printf("failed to allocate %d bytes\n", get_size_resp.size);
-            return 0;
+
+        // If message has any data
+        if(get_size_resp.size > 0){
+            get_message_resp.data = (uint8_t*) malloc(get_size_resp.size);
+            req_success = spi_get_message(&get_message_resp, GET_MESSAGE, stream_name, get_size_resp.size);
+            if(req_success){
+                requested_data->data = get_message_resp.data;
+                requested_data->size = get_message_resp.data_size;
+            }
+        } else {
+            // message doesn't have any data
+            requested_data->data = nullptr;
+            requested_data->size = 0;
+            req_success = 1;
         }
 
-        req_success = spi_get_message(&get_message_resp, GET_MESSAGE, stream_name, get_size_resp.size);
-        if(req_success){
-            requested_data->data = get_message_resp.data;
-            requested_data->size = get_message_resp.data_size;
-        }
     }
 
     return req_success;
@@ -552,9 +557,9 @@ uint8_t SpiApi::req_message(Message* received_msg, const char* stream_name){
     uint8_t req_data_success = 0;
     uint8_t req_meta_success = 0;
 
-    Metadata raw_meta;
-    Data raw_data;
-
+    // Nulling out just in case
+    Metadata raw_meta = {};
+    Data raw_data = {};
 
     // ----------------------------------------
     // example of receiving messages.
