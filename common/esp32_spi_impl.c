@@ -25,13 +25,13 @@ This ISR is called when the handshake line goes low.
 */
 static void IRAM_ATTR gpio_handshake_isr_handler(void* arg)
 {
-    //Sometimes due to interference or ringing or something, we get two irqs after eachother. This is solved by
-    //looking at the time between interrupts and refusing any interrupt too close to another one.
-    static uint32_t lasthandshaketime;
-    uint32_t currtime=xthal_get_ccount();
-    uint32_t diff=currtime-lasthandshaketime;
-    if (diff<120000) return; //ignore everything <0.5ms after an earlier irq
-    lasthandshaketime=currtime;
+    // //Sometimes due to interference or ringing or something, we get two irqs after eachother. This is solved by
+    // //looking at the time between interrupts and refusing any interrupt too close to another one.
+    // static uint32_t lasthandshaketime;
+    // uint32_t currtime=xthal_get_ccount();
+    // uint32_t diff=currtime-lasthandshaketime;
+    // if (diff<120000) return; //ignore everything <0.5ms after an earlier irq
+    // lasthandshaketime=currtime;
 
     //Give the semaphore.
     BaseType_t mustYield=false;
