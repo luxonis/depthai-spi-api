@@ -57,12 +57,20 @@ void SpiApi::set_recv_spi_impl(uint8_t (*passed_recv_spi)(char*)){
     recv_spi_impl = passed_recv_spi;
 }
 
+void SpiApi::set_spi_transfer_impl(uint8_t (*transfer_impl)(const char*, size_t, char*, size_t)){
+    spi_transfer_impl = transfer_impl;
+}
+
 uint8_t SpiApi::generic_send_spi(const char* spi_send_packet){
     return (*send_spi_impl)(spi_send_packet);
 }
 
 uint8_t SpiApi::generic_recv_spi(char* recvbuf){
     return (*recv_spi_impl)(recvbuf);
+}
+
+uint8_t SpiApi::generic_spi_transfer(const char* send_buffer, size_t send_size, char* receive_buffer, size_t receive_size){
+    return (*spi_transfer_impl)(send_buffer, send_size, receive_buffer, receive_size);
 }
 
 uint8_t SpiApi::spi_get_size(SpiGetSizeResp *response, spi_command get_size_cmd, const char * stream_name){
@@ -595,8 +603,66 @@ void SpiApi::set_chunk_packet_cb(void (*passed_chunk_message_cb)(char*, uint32_t
     chunk_message_cb = passed_chunk_message_cb;
 }
 
+/*
 void SpiApi::chunk_message(const char* stream_name){
     uint8_t req_success = 0;
+
+    // do a get_size before trying to retreive message.
+    SpiGetSizeResp get_size_resp;
+    req_success = spi_get_size(&get_size_resp, GET_SIZE, stream_name);
+    debug_cmd_print("get_size_resp: %d\n", get_size_resp.size);
+
+    if(req_success){
+        // send a get message command (assuming we got size)
+        spi_generate_command(spi_send_packet, GET_MESSAGE, strlen(stream_name)+1, stream_name);
+        generic_send_spi((char *)spi_send_packet);
+        //usleep(1000);
+        uint32_t message_size = get_size_resp.size;
+        uint32_t total_recv = 0;
+        printf("got message size - %d", message_size);
+        while(total_recv < message_size){
+            char recvbuf[BUFF_MAX_SIZE] = {0};
+            req_success = generic_recv_spi(recvbuf);
+            if(req_success){
+                //if(recvbuf[0]==START_BYTE_MAGIC){
+
+                    SpiProtocolPacket* spiRecvPacket = spi_protocol_parse(spi_proto_instance, (uint8_t*)recvbuf, sizeof(recvbuf));
+
+                    if(spiRecvPacket != nullptr){
+                        printf("chund - spi packet != null first byte: 0x%02X 0x%02X 0x%02X 0x%02X\n", recvbuf[0], recvbuf[1], recvbuf[2], recvbuf[3]);
+
+                        // got packet, call callback with data
+                        uint32_t remaining_data = message_size-total_recv;
+                        uint32_t curr_packet_size = 0;
+                        if ( remaining_data < PAYLOAD_MAX_SIZE ){
+                            curr_packet_size = remaining_data;
+                        } else {
+                            curr_packet_size = PAYLOAD_MAX_SIZE;
+                        }
+
+                        chunk_message_cb((char*)spiRecvPacket->data, curr_packet_size, message_size);
+                        total_recv += curr_packet_size;
+
+                    }
+
+
+                // }else if(recvbuf[0] != 0x00){
+                //     //printf("*************************************** got a half/non aa packet ************************************************\n");
+                //     //req_success = 0;
+                //     //break;
+                // }
+            } else {
+                printf("failed to recv packet\n");
+                req_success = 0;
+                break;
+            }
+        }
+    }
+}
+*/
+
+bool SpiApi::chunk_message(const char* stream_name){
+    uint8_t req_success = 1;
 
     // do a get_size before trying to retreive message.
     SpiGetSizeResp get_size_resp;
@@ -646,6 +712,8 @@ void SpiApi::chunk_message(const char* stream_name){
             }
         }
     }
+
+    return req_success;
 }
 
 // Static functions

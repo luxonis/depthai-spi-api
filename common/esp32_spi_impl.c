@@ -3,12 +3,12 @@
 /*
 SPI sender (master) example.
 
-This example is supposed to work together with the SPI receiver. It uses the standard SPI pins (MISO, MOSI, SCLK, CS) to 
+This example is supposed to work together with the SPI receiver. It uses the standard SPI pins (MISO, MOSI, SCLK, CS) to
 transmit data over in a full-duplex fashion, that is, while the master puts data on the MOSI pin, the slave puts its own
 data on the MISO pin.
 
 This example uses one extra pin: GPIO_HANDSHAKE is used as a handshake pin. The slave makes this pin high as soon as it is
-ready to receive/send data. This code connects this line to a GPIO interrupt which gives the rdySem semaphore. The main 
+ready to receive/send data. This code connects this line to a GPIO interrupt which gives the rdySem semaphore. The main
 task waits for this semaphore to be given before queueing a transmission.
 */
 
@@ -30,7 +30,7 @@ static void IRAM_ATTR gpio_handshake_isr_handler(void* arg)
     static uint32_t lasthandshaketime;
     uint32_t currtime=xthal_get_ccount();
     uint32_t diff=currtime-lasthandshaketime;
-    if (diff<240000) return; //ignore everything <1ms after an earlier irq
+    if (diff<120000) return; //ignore everything <0.5ms after an earlier irq
     lasthandshaketime=currtime;
 
     //Give the semaphore.
@@ -71,7 +71,7 @@ void init_esp32_spi(){
     };
 
     // prep spi transaction
-    
+
 
     //Create the semaphore.
     rdySem=xSemaphoreCreateBinary();
@@ -88,7 +88,7 @@ void init_esp32_spi(){
     ret=spi_bus_add_device(HSPI_HOST, &devcfg, &handle);
     assert(ret==ESP_OK);
 
-    //Assume the slave is ready for the first transmission: if the slave started up before us, we will not detect 
+    //Assume the slave is ready for the first transmission: if the slave started up before us, we will not detect
     //positive edge on the handshake line.
     xSemaphoreGive(rdySem);
 
@@ -122,6 +122,30 @@ uint8_t esp32_send_spi(const char* sendbuf){
     return status;
 }
 
+/*
+uint8_t esp32_recv_spi(char* recvbuf){
+    uint8_t status = 0;
+    //if(xSemaphoreTake(rdySem, ( TickType_t ) RECV_TIMEOUT_TICKS) == pdPASS){
+        memset(&spi_trans, 0, sizeof(spi_trans));
+        spi_trans.length=SPI_PKT_SIZE*8;
+        spi_trans.rx_buffer=recvbuf;
+        spi_trans.tx_buffer=emptyPacket;
+        esp_err_t trans_result = spi_device_transmit(handle, &spi_trans);
+        if(trans_result == ESP_OK){
+            status = 1;
+        } else {
+            status = 0;
+            printf("trans_result issue: %d\n", trans_result);
+        }
+    //} else {
+    //    printf("Timeout: no response from remote device...\n");
+    //    status = 0;
+    //}
+
+    return status;
+}
+*/
+
 uint8_t esp32_recv_spi(char* recvbuf){
     uint8_t status = 0;
     if(xSemaphoreTake(rdySem, ( TickType_t ) RECV_TIMEOUT_TICKS) == pdPASS){
@@ -143,4 +167,27 @@ uint8_t esp32_recv_spi(char* recvbuf){
     return status;
 }
 
+uint8_t esp32_transfer_spi(const char* send_buffer, size_t send_size, char* receive_buffer, size_t receive_size){
+
+    // TODO - test it out
+    return 0;
+
+    // spi_transaction_t spi_trans;
+    // memset(&spi_trans, 0, sizeof(spi_trans));
+    // spi_trans.length = send_size * 8; // bits
+    // spi_trans.tx_buffer = send_buffer;
+    // if(receive_size == 0){
+    //     spi_trans.tx_buffer = NULL;
+    // } else {
+    //     spi_trans.rx_buffer = receive_buffer;
+    //     spi_trans.rxlength = receive_size * 8; // bits
+    // }
+    //
+    // esp_err_t trans_result = spi_device_transmit(handle, &spi_trans);
+    // if(trans_result != ESP_OK){
+    //     return 0;
+    // }
+    //
+    // return 1;
+}
 

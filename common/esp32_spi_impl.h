@@ -55,6 +55,7 @@ void init_esp32_spi();
 void deinit_esp32_spi();
 uint8_t esp32_send_spi(const char* sendbuf);
 uint8_t esp32_recv_spi(char* recvbuf);
+uint8_t esp32_transfer_spi(const char* send_buffer, size_t send_size, char* receive_buffer, size_t receive_size);
 
 #ifdef __cplusplus
 }
