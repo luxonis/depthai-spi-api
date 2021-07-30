@@ -6,7 +6,7 @@
 #include <cstring>
 #include <cassert>
 
-#define DEBUG_CMD 1
+#define DEBUG_CMD 0
 #define debug_cmd_print(...) \
     do { if (DEBUG_CMD) fprintf(stderr, __VA_ARGS__); } while (0)
 
