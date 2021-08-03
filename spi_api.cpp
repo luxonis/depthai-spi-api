@@ -5,6 +5,8 @@
 #include <cstddef>
 #include <cstring>
 #include <cassert>
+#include <chrono>
+#include <thread>
 
 #define DEBUG_CMD 0
 #define debug_cmd_print(...) \
@@ -13,6 +15,7 @@
 #define DEBUG_MESSAGE_CONTENTS 0
 
 namespace dai {
+// namespace spi {
 
 // static function definitions
 static std::vector<std::uint8_t> serialize_metadata(const RawBuffer& msg);
@@ -57,7 +60,7 @@ void SpiApi::set_recv_spi_impl(uint8_t (*passed_recv_spi)(char*)){
     recv_spi_impl = passed_recv_spi;
 }
 
-void SpiApi::set_spi_transfer_impl(uint8_t (*transfer_impl)(const char*, size_t, char*, size_t)){
+void SpiApi::set_spi_transfer_impl(uint8_t (*transfer_impl)(const void*, size_t, void*, size_t)){
     spi_transfer_impl = transfer_impl;
 }
 
@@ -69,7 +72,7 @@ uint8_t SpiApi::generic_recv_spi(char* recvbuf){
     return (*recv_spi_impl)(recvbuf);
 }
 
-uint8_t SpiApi::generic_spi_transfer(const char* send_buffer, size_t send_size, char* receive_buffer, size_t receive_size){
+uint8_t SpiApi::generic_spi_transfer(const void* send_buffer, size_t send_size, void* receive_buffer, size_t receive_size){
     return (*spi_transfer_impl)(send_buffer, send_size, receive_buffer, receive_size);
 }
 
@@ -599,7 +602,7 @@ void SpiApi::free_message(Message* received_msg){
 
 
 
-void SpiApi::set_chunk_packet_cb(void (*passed_chunk_message_cb)(char*, uint32_t, uint32_t)){
+void SpiApi::set_chunk_packet_cb(void (*passed_chunk_message_cb)(void*, uint32_t, uint32_t)){
     chunk_message_cb = passed_chunk_message_cb;
 }
 
@@ -716,6 +719,45 @@ bool SpiApi::chunk_message(const char* stream_name){
     return req_success;
 }
 
+bool SpiApi::chunk_message2(const char* stream_name, void* buffer, size_t size, std::function<void(void*, size_t, size_t)> cb){
+    uint8_t req_success = 1;
+
+    // do a get_size before trying to retreive message.
+    SpiGetSizeResp get_size_resp;
+    req_success = spi_get_size(&get_size_resp, GET_SIZE, stream_name);
+    debug_cmd_print("get_size_resp: %d\n", get_size_resp.size);
+
+    if(req_success){
+        // send a get message command (assuming we got size)
+        spi_generate_command(spi_send_packet, GET_MESSAGE_FAST, strlen(stream_name)+1, stream_name);
+        generic_send_spi((char *)spi_send_packet);
+
+        // no sync - wait till command ready
+        std::this_thread::sleep_for(std::chrono::milliseconds(5));
+
+        size_t totalTransmitSize = 0;
+
+        int numPackets = ((get_size_resp.size-1) / size) + 1;
+        for(int i = 0 ; i < numPackets; i++){
+            size_t transmitSize = std::min(size, get_size_resp.size - (i*size));
+            totalTransmitSize += transmitSize;
+            generic_spi_transfer(nullptr, 0, buffer, transmitSize);
+            if(cb){
+                cb(buffer, transmitSize, get_size_resp.size);
+            }
+        }
+
+        printf("chunk_message2 - totalTransmitSize: %d, size: %d\n", totalTransmitSize, get_size_resp.size);
+        assert(totalTransmitSize == get_size_resp.size);
+
+    }
+
+    std::this_thread::sleep_for(std::chrono::milliseconds(5));
+
+    return req_success;
+}
+
+
 // Static functions
 
 // Serialize only metadata into a separate vector
@@ -745,5 +787,6 @@ std::vector<std::uint8_t> serialize_metadata(const RawBuffer& msg) {
 }
 
 
+// }  // namespace spi
 }  // namespace dai
 

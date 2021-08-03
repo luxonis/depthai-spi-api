@@ -46,7 +46,8 @@ void init_esp32_spi(){
         .miso_io_num=GPIO_MISO,
         .sclk_io_num=GPIO_SCLK,
         .quadwp_io_num=-1,
-        .quadhd_io_num=-1
+        .quadhd_io_num=-1,
+        .max_transfer_sz = 4*1024
     };
 
     //Configuration for the SPI device on the other side of the bus
@@ -54,11 +55,16 @@ void init_esp32_spi(){
         .command_bits=0,
         .address_bits=0,
         .dummy_bits=0,
-        .clock_speed_hz=4000000, // TODO Tried 5 MHz and it became unstable?
+        .clock_speed_hz=4000000,
+        // TODO(themarpe) - enable .clock_speed_hz=20000000
         .duty_cycle_pos=128,        //50% duty cycle
-        .mode=0,
+        .mode=1,
+        //.mode=0,
         .spics_io_num=GPIO_CS,
-        .cs_ena_posttrans=3,        //Keep the CS low 3 cycles after transaction, to stop slave from missing the last bit when CS has less propagation delay than CLK
+        .cs_ena_pretrans = 4,
+        // IMPORTANT - Keep the CS for a little more after transaction, to stop slave from missing the last bit when CS has less propagation delay than CLK
+        .cs_ena_posttrans = 4,
+        //.cs_ena_posttrans = 3,
         .queue_size=3
     };
 
@@ -69,9 +75,6 @@ void init_esp32_spi(){
         .pull_up_en=1,
         .pin_bit_mask=(1<<GPIO_HANDSHAKE)
     };
-
-    // prep spi transaction
-
 
     //Create the semaphore.
     rdySem=xSemaphoreCreateBinary();
@@ -87,6 +90,16 @@ void init_esp32_spi(){
     assert(ret==ESP_OK);
     ret=spi_bus_add_device(HSPI_HOST, &devcfg, &handle);
     assert(ret==ESP_OK);
+
+
+    // // CS for entire duration of transfer
+    // io_conf = {
+    //     .mode=GPIO_MODE_OUTPUT,
+    //     .pull_up_en=1,
+    //     .pin_bit_mask=(1<<GPIO_CS)
+    // };
+    // // prep spi transaction
+    // gpio_config(&io_conf);
 
     //Assume the slave is ready for the first transmission: if the slave started up before us, we will not detect
     //positive edge on the handshake line.
@@ -167,27 +180,42 @@ uint8_t esp32_recv_spi(char* recvbuf){
     return status;
 }
 
-uint8_t esp32_transfer_spi(const char* send_buffer, size_t send_size, char* receive_buffer, size_t receive_size){
+uint8_t esp32_transfer_spi(const void* send_buffer, size_t send_size, void* receive_buffer, size_t receive_size){
 
-    // TODO - test it out
-    return 0;
 
-    // spi_transaction_t spi_trans;
-    // memset(&spi_trans, 0, sizeof(spi_trans));
-    // spi_trans.length = send_size * 8; // bits
-    // spi_trans.tx_buffer = send_buffer;
-    // if(receive_size == 0){
-    //     spi_trans.tx_buffer = NULL;
-    // } else {
-    //     spi_trans.rx_buffer = receive_buffer;
-    //     spi_trans.rxlength = receive_size * 8; // bits
-    // }
-    //
-    // esp_err_t trans_result = spi_device_transmit(handle, &spi_trans);
-    // if(trans_result != ESP_OK){
-    //     return 0;
-    // }
-    //
-    // return 1;
+    spi_transaction_t spi_trans;
+    memset(&spi_trans, 0, sizeof(spi_trans));
+
+    size_t transfer_size = send_size;
+    if(receive_size > send_size){
+        transfer_size = receive_size;
+    }
+
+    spi_trans.length = transfer_size * 8; // bits
+    spi_trans.tx_buffer = send_buffer;
+    if(receive_size == 0){
+        spi_trans.rx_buffer = NULL;
+    } else {
+        spi_trans.rx_buffer = receive_buffer;
+        spi_trans.rxlength = receive_size * 8; // bits
+    }
+
+    esp_err_t trans_result = spi_device_transmit(handle, &spi_trans);
+    if(trans_result != ESP_OK){
+        printf("error in spi transmit: %d\n", trans_result);
+        return 0;
+    }
+
+    return 1;
 }
 
+
+uint8_t esp32_enable_spi_cs(uint8_t enable){
+    if(enable){
+        gpio_set_level(GPIO_CS, 0);
+    } else {
+        gpio_set_level(GPIO_CS, 1);
+    }
+
+    return true;
+}
