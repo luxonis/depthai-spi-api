@@ -719,45 +719,6 @@ bool SpiApi::chunk_message(const char* stream_name){
     return req_success;
 }
 
-bool SpiApi::chunk_message2(const char* stream_name, void* buffer, size_t size, std::function<void(void*, size_t, size_t)> cb){
-    uint8_t req_success = 1;
-
-    // do a get_size before trying to retreive message.
-    SpiGetSizeResp get_size_resp;
-    req_success = spi_get_size(&get_size_resp, GET_SIZE, stream_name);
-    debug_cmd_print("get_size_resp: %d\n", get_size_resp.size);
-
-    if(req_success){
-        // send a get message command (assuming we got size)
-        spi_generate_command(spi_send_packet, GET_MESSAGE_FAST, strlen(stream_name)+1, stream_name);
-        generic_send_spi((char *)spi_send_packet);
-
-        // no sync - wait till command ready
-        std::this_thread::sleep_for(std::chrono::milliseconds(5));
-
-        size_t totalTransmitSize = 0;
-
-        int numPackets = ((get_size_resp.size-1) / size) + 1;
-        for(int i = 0 ; i < numPackets; i++){
-            size_t transmitSize = std::min(size, get_size_resp.size - (i*size));
-            totalTransmitSize += transmitSize;
-            generic_spi_transfer(nullptr, 0, buffer, transmitSize);
-            if(cb){
-                cb(buffer, transmitSize, get_size_resp.size);
-            }
-        }
-
-        printf("chunk_message2 - totalTransmitSize: %d, size: %d\n", totalTransmitSize, get_size_resp.size);
-        assert(totalTransmitSize == get_size_resp.size);
-
-    }
-
-    std::this_thread::sleep_for(std::chrono::milliseconds(5));
-
-    return req_success;
-}
-
-
 // Static functions
 
 // Serialize only metadata into a separate vector

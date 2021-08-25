@@ -100,7 +100,6 @@ class SpiApi {
 
         // methods for receiving a large message piece by piece
         bool chunk_message(const char* stream_name);
-        bool chunk_message2(const char* stream_name, void* buffer, size_t size, std::function<void(void*, size_t, size_t)>);
         void set_chunk_packet_cb(void (*passed_chunk_message_cb)(void*, uint32_t, uint32_t));
 
         // Sending
