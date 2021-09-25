@@ -91,8 +91,18 @@ uint8_t SpiApi::spi_get_size(SpiGetSizeResp *response, spi_command get_size_cmd,
     if(recv_success){
         if(recvbuf[0]==START_BYTE_MAGIC){
             SpiProtocolPacket* spiRecvPacket = spi_protocol_parse(spi_proto_instance, (uint8_t*)recvbuf, sizeof(recvbuf));
+            if(spiRecvPacket == nullptr){
+                return false;
+            }
             spi_parse_get_size_resp(response, spiRecvPacket->data);
-            success = 1;
+
+            // Check if size = 0xFFFFFFFF -> no message available
+            // TODO(themarpe) - hack, refactor SPI library as a whole
+            if(response->size == 0xFFFFFFFFU){
+                success = 0;
+            } else {
+                success = 1;
+            }
 
         }else if(recvbuf[0] != 0x00){
             printf("*************************************** got a half/non aa packet ************************************************\n");
@@ -116,6 +126,7 @@ uint8_t SpiApi::spi_get_message(SpiGetMessageResp *response, spi_command get_mes
 
     uint32_t total_recv = 0;
     int debug_skip = 0;
+    int error_count = 0;
     while(total_recv < size){
         if(debug_skip%20 == 0){
             debug_cmd_print("receive spi_get_message response from remote device... %d/%d\n", total_recv, size);
@@ -127,6 +138,16 @@ uint8_t SpiApi::spi_get_message(SpiGetMessageResp *response, spi_command get_mes
         if(recv_success){
             if(recvbuf[0]==START_BYTE_MAGIC){
                 SpiProtocolPacket* spiRecvPacket = spi_protocol_parse(spi_proto_instance, (uint8_t*)recvbuf, sizeof(recvbuf));
+                if(spiRecvPacket == nullptr){
+                    error_count++;
+                    if(error_count > 5){
+                        //printf("Error %d/5...\n", error_count);
+                        return false;
+                    } else {
+                        continue;
+                    }
+                }
+
                 uint32_t remaining_data = size-total_recv;
                 if ( remaining_data < PAYLOAD_MAX_SIZE ){
                     memcpy(response->data+total_recv, spiRecvPacket->data, remaining_data);
@@ -173,6 +194,7 @@ uint8_t SpiApi::spi_get_message_partial(SpiGetMessageResp *response, const char 
 
     uint32_t total_recv = 0;
     int debug_skip = 0;
+    int error_count = 0;
     while(total_recv < size){
         if(debug_skip%20 == 0){
             debug_cmd_print("receive GET_MESSAGE_PART response from remote device... %d/%d\n", total_recv, size);
@@ -184,6 +206,16 @@ uint8_t SpiApi::spi_get_message_partial(SpiGetMessageResp *response, const char 
         if(recv_success){
             if(recvbuf[0]==START_BYTE_MAGIC){
                 SpiProtocolPacket* spiRecvPacket = spi_protocol_parse(spi_proto_instance, (uint8_t*)recvbuf, sizeof(recvbuf));
+                if(spiRecvPacket == nullptr){
+                    error_count++;
+                    if(error_count > 5){
+                        //printf("Error %d/5...\n", error_count);
+                        return false;
+                    } else {
+                        continue;
+                    }
+                }
+
                 uint32_t remaining_data = size-total_recv;
                 if ( remaining_data < PAYLOAD_MAX_SIZE ){
                     memcpy(response->data+total_recv, spiRecvPacket->data, remaining_data);
@@ -241,6 +273,10 @@ uint8_t SpiApi::spi_pop_messages(){
     if(recv_success){
         if(recvbuf[0]==START_BYTE_MAGIC){
             SpiProtocolPacket* spiRecvPacket = spi_protocol_parse(spi_proto_instance, (uint8_t*)recvbuf, sizeof(recvbuf));
+            if(spiRecvPacket == nullptr){
+                return false;
+            }
+
             spi_status_resp(&response, spiRecvPacket->data);
             if(response.status == SPI_MSG_SUCCESS_RESP){
                 success = 1;
@@ -273,6 +309,10 @@ uint8_t SpiApi::spi_pop_message(const char * stream_name){
     if(recv_success){
         if(recvbuf[0]==START_BYTE_MAGIC){
             SpiProtocolPacket* spiRecvPacket = spi_protocol_parse(spi_proto_instance, (uint8_t*)recvbuf, sizeof(recvbuf));
+            if(spiRecvPacket == nullptr){
+                return false;
+            }
+
             spi_status_resp(&response, spiRecvPacket->data);
             if(response.status == SPI_MSG_SUCCESS_RESP){
                 success = 1;
@@ -305,6 +345,10 @@ std::vector<std::string> SpiApi::spi_get_streams(){
     if(recv_success){
         if(recvbuf[0]==START_BYTE_MAGIC){
             SpiProtocolPacket* spiRecvPacket = spi_protocol_parse(spi_proto_instance, (uint8_t*)recvbuf, sizeof(recvbuf));
+            if(spiRecvPacket == nullptr){
+                return {};
+            }
+
             spi_parse_get_streams_resp(&response, spiRecvPacket->data);
 
             std::string currStr;
@@ -405,6 +449,10 @@ uint8_t SpiApi::send_data(Data *sdata, const char* stream_name){
     if(recv_success){
         if(recvbuf[0]==START_BYTE_MAGIC){
             SpiProtocolPacket* spiRecvPacket = spi_protocol_parse(spi_proto_instance, (uint8_t*)recvbuf, sizeof(recvbuf));
+            if(spiRecvPacket == nullptr){
+                return false;
+            }
+
             spi_status_resp(&response, spiRecvPacket->data);
             if(response.status == SPI_MSG_SUCCESS_RESP){
                 transfer(sdata->data, sdata->size);
@@ -449,6 +497,10 @@ bool SpiApi::send_message(const RawBuffer& msg, const char* stream_name){
         // TODO: check for SPI_MSG_FAIL_RESP and don't send.
         if(recvbuf[0]==START_BYTE_MAGIC){
             SpiProtocolPacket* spiRecvPacket = spi_protocol_parse(spi_proto_instance, (uint8_t*)recvbuf, sizeof(recvbuf));
+            if(spiRecvPacket == nullptr){
+                return false;
+            }
+
             spi_status_resp(&response, spiRecvPacket->data);
             if(response.status == SPI_MSG_SUCCESS_RESP){
                 transfer2(msg.data.data(), metadata.data(), msg.data.size(), metadata.size());
@@ -577,14 +629,20 @@ uint8_t SpiApi::req_message(Message* received_msg, const char* stream_name){
     // ----------------------------------------
     // the req_data method allocates memory for the received packet. we need to be sure to free it when we're done with it.
     req_data_success = req_data(&raw_data, stream_name);
+    if(!req_data_success){
+        return false;
+    }
 
     // ----------------------------------------
     // example of getting message metadata
     // ----------------------------------------
     // the req_metadata method allocates memory for the received packet. we need to be sure to free it when we're done with it.
     req_meta_success = req_metadata(&raw_meta, stream_name);
+    if(!req_meta_success){
+        return false;
+    }
 
-
+    // TODO(themarpe) - check success return
     if(req_data_success && req_meta_success){
         received_msg->raw_data = raw_data;
         received_msg->raw_meta = raw_meta;
@@ -679,12 +737,24 @@ bool SpiApi::chunk_message(const char* stream_name){
 
         uint32_t message_size = get_size_resp.size;
         uint32_t total_recv = 0;
+        int error_count = 0;
+
         while(total_recv < message_size){
             char recvbuf[BUFF_MAX_SIZE] = {0};
             req_success = generic_recv_spi(recvbuf);
             if(req_success){
                 if(recvbuf[0]==START_BYTE_MAGIC){
                     SpiProtocolPacket* spiRecvPacket = spi_protocol_parse(spi_proto_instance, (uint8_t*)recvbuf, sizeof(recvbuf));
+                    if(spiRecvPacket == nullptr){
+                        error_count++;
+                        if(error_count > 5){
+                            //printf("Error %d/5...\n", error_count);
+                            return false;
+                        } else {
+                            continue;
+                        }
+                    }
+
                     uint32_t remaining_data = message_size-total_recv;
                     uint32_t curr_packet_size = 0;
                     if ( remaining_data < PAYLOAD_MAX_SIZE ){
