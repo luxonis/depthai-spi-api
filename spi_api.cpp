@@ -175,7 +175,7 @@ uint8_t SpiApi::spi_get_message(SpiGetMessageResp *response, spi_command get_mes
         }
     }
 
-    if(error_count > 0 && total_recv==size){
+    if(error_count == 0 && total_recv==size){
         spi_parse_get_message(response, size, get_mess_cmd);
 
         if(DEBUG_MESSAGE_CONTENTS){
@@ -546,6 +546,9 @@ uint8_t SpiApi::req_data(Data *requested_data, const char* stream_name){
             if(req_success){
                 requested_data->data = get_message_resp.data;
                 requested_data->size = get_message_resp.data_size;
+            } else {
+                free(get_message_resp.data);
+                return false;
             }
         } else {
             // message doesn't have any data
@@ -577,6 +580,9 @@ uint8_t SpiApi::req_metadata(Metadata *requested_data, const char* stream_name){
                 requested_data->data = get_message_resp.data;
                 requested_data->size = get_message_resp.data_size;
                 requested_data->type = (dai::DatatypeEnum) get_message_resp.data_type;
+            } else {
+                free(get_message_resp.data);
+                return false;
             }
         }else{
             printf("failed to allocate %d bytes\n", get_size_resp.size);
@@ -604,6 +610,9 @@ uint8_t SpiApi::req_data_partial(Data *requested_data, const char* stream_name, 
                 if(req_success){
                     requested_data->data = get_message_resp.data;
                     requested_data->size = get_message_resp.data_size;
+                } else {
+                    free(get_message_resp.data);
+                    return false;
                 }
             } else {
                 printf("failed to allocate %d bytes\n", get_size_resp.size);
