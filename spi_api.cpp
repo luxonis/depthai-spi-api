@@ -158,30 +158,36 @@ uint8_t SpiApi::spi_get_message(SpiGetMessageResp *response, spi_command get_mes
                 }
 
             }else if(recvbuf[0] != 0x00){
-                printf("*************************************** got a half/non aa packet ************************************************\n");
-                break;
+                //printf("*************************************** got a half/non aa packet ************************************************\n");
+                error_count++;
+                if(error_count > 5){
+                    return false;
+                }
+                continue;
             }
         } else {
-            printf("failed to recv packet\n");
-            break;
+            //printf("failed to recv packet\n");
+            error_count++;
+            if(error_count > 5){
+                return false;
+            }
+            continue;
         }
     }
 
-
-    if(total_recv==size){
+    if(error_count > 0 && total_recv==size){
         spi_parse_get_message(response, size, get_mess_cmd);
 
         if(DEBUG_MESSAGE_CONTENTS){
             printf("data_size: %d\n", response->data_size);
             debug_print_hex((uint8_t*)response->data, response->data_size);
         }
-        success = 1;
+        return true;
     } else {
-        printf("full packet not received %d/%d!\n", total_recv, size);
-        success = 0;
+        //printf("full packet not received %d/%d!\n", total_recv, size);
+        return false;
     }
 
-    return success;
 }
 
 
@@ -784,6 +790,125 @@ bool SpiApi::chunk_message(const char* stream_name){
                 break;
             }
         }
+
+        if(error_count > 0){
+            return false;
+        }
+
+    }
+
+    return req_success;
+}
+
+
+bool SpiApi::chunk_message_buffer(const char* stream_name, uint8_t* buffer, size_t size){
+    uint8_t req_success = 1;
+
+    // do a get_size before trying to retreive message.
+    SpiGetSizeResp get_size_resp;
+    req_success = spi_get_size(&get_size_resp, GET_SIZE, stream_name);
+    debug_cmd_print("get_size_resp: %d\n", get_size_resp.size);
+
+    if(req_success){
+        // send a get message command (assuming we got size)
+        spi_generate_command(spi_send_packet, GET_MESSAGE, strlen(stream_name)+1, stream_name);
+        generic_send_spi((char *)spi_send_packet);
+
+        uint32_t message_size = get_size_resp.size;
+        uint32_t total_recv = 0;
+        int error_count = 0;
+
+        size_t offset = 0;
+        std::thread pingPongThread;
+        uint8_t* currentTemp = buffer;
+        size_t currentTempSize = size / 2;
+        uint8_t* currentSend = buffer + currentTempSize;
+
+        while(total_recv < message_size){
+            char recvbuf[BUFF_MAX_SIZE] = {0};
+            req_success = generic_recv_spi(recvbuf);
+            if(req_success){
+                if(recvbuf[0]==START_BYTE_MAGIC){
+                    SpiProtocolPacket* spiRecvPacket = spi_protocol_parse(spi_proto_instance, (uint8_t*)recvbuf, sizeof(recvbuf));
+                    if(spiRecvPacket == nullptr){
+                        error_count++;
+                        if(error_count > 5){
+                            break;
+                        } else {
+                            continue;
+                        }
+                    }
+
+                    uint32_t remaining_data = message_size-total_recv;
+                    uint32_t curr_packet_size = 0;
+                    if ( remaining_data < PAYLOAD_MAX_SIZE ){
+                        curr_packet_size = remaining_data;
+                    } else {
+                        curr_packet_size = PAYLOAD_MAX_SIZE;
+                    }
+
+
+                    // If buffer is full, send it out first
+                    if(curr_packet_size + offset > currentTempSize){
+                        //printf("Added up to: %d, with cur packet size: %d\n", offset, curr_packet_size);
+
+                        // Wait until its send
+                        if(pingPongThread.joinable()) pingPongThread.join();
+                        std::swap(currentTemp, currentSend);
+                        pingPongThread = std::thread([this, currentSend, offset, message_size]{
+                            if(chunk_message_cb != nullptr){
+                                chunk_message_cb((char*)currentSend, offset, message_size);
+                            }
+                        });
+
+                        offset = 0;
+                    }
+                    // Append to temporary buffer
+                    memcpy(&currentTemp[offset], spiRecvPacket->data, curr_packet_size);
+                    offset += curr_packet_size;
+
+                    // if(chunk_message_cb != NULL){
+                    //     chunk_message_cb((char*)spiRecvPacket->data, curr_packet_size, message_size);
+                    //     if(DEBUG_MESSAGE_CONTENTS){
+                    //         debug_print_hex((uint8_t*)spiRecvPacket->data, curr_packet_size);
+                    //     }
+                    // } else {
+                    //     printf("WARNING: chunk_message called without setting callback!");
+                    // }
+
+                    total_recv += curr_packet_size;
+
+                }else if(recvbuf[0] != 0x00){
+                    printf("*************************************** got a half/non aa packet ************************************************\n");
+                    req_success = 0;
+                    break;
+                }
+            } else {
+                printf("failed to recv packet\n");
+                req_success = 0;
+                break;
+            }
+        }
+
+        if(offset != 0){
+
+            if(pingPongThread.joinable()) pingPongThread.join();
+            std::swap(currentTemp, currentSend);
+            pingPongThread = std::thread([this, currentSend, offset, message_size]{
+                if(chunk_message_cb != nullptr){
+                    chunk_message_cb((char*)currentSend, offset, message_size);
+                }
+            });
+
+            offset = 0;
+        }
+
+        if(pingPongThread.joinable()) pingPongThread.join();
+
+        if(error_count > 0){
+            return false;
+        }
+
     }
 
     return req_success;

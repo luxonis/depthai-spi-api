@@ -101,6 +101,7 @@ class SpiApi {
         // methods for receiving a large message piece by piece
         bool chunk_message(const char* stream_name);
         void set_chunk_packet_cb(void (*passed_chunk_message_cb)(void*, uint32_t, uint32_t));
+        bool chunk_message_buffer(const char* stream_name, uint8_t* buffer, size_t size);
 
         // Sending
         bool send_message(const std::shared_ptr<RawBuffer>& sp_msg, const char* stream_name);
