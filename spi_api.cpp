@@ -818,6 +818,11 @@ bool SpiApi::chunk_message_buffer(const char* stream_name, uint8_t* buffer, size
     req_success = spi_get_size(&get_size_resp, GET_SIZE, stream_name);
     debug_cmd_print("get_size_resp: %d\n", get_size_resp.size);
 
+    if(req_success == 0 && get_size_resp.size != 0xFFFFFFFFU){
+        printf("Error receiving message\n");
+        return false;
+    }
+
     if(req_success){
         // send a get message command (assuming we got size)
         spi_generate_command(spi_send_packet, GET_MESSAGE, strlen(stream_name)+1, stream_name);
@@ -825,7 +830,7 @@ bool SpiApi::chunk_message_buffer(const char* stream_name, uint8_t* buffer, size
 
         uint32_t message_size = get_size_resp.size;
         uint32_t total_recv = 0;
-        int error_count = 0;
+        bool errorReceiving = false;
 
         size_t offset = 0;
         std::thread pingPongThread;
@@ -840,12 +845,8 @@ bool SpiApi::chunk_message_buffer(const char* stream_name, uint8_t* buffer, size
                 if(recvbuf[0]==START_BYTE_MAGIC){
                     SpiProtocolPacket* spiRecvPacket = spi_protocol_parse(spi_proto_instance, (uint8_t*)recvbuf, sizeof(recvbuf));
                     if(spiRecvPacket == nullptr){
-                        error_count++;
-                        if(error_count > 5){
-                            break;
-                        } else {
-                            continue;
-                        }
+                        errorReceiving = true;
+                        break;
                     }
 
                     uint32_t remaining_data = message_size-total_recv;
@@ -888,37 +889,35 @@ bool SpiApi::chunk_message_buffer(const char* stream_name, uint8_t* buffer, size
                     total_recv += curr_packet_size;
 
                 }else if(recvbuf[0] != 0x00){
-                    printf("*************************************** got a half/non aa packet ************************************************\n");
-                    req_success = 0;
+                    errorReceiving = true;
                     break;
                 }
             } else {
-                printf("failed to recv packet\n");
-                req_success = 0;
+                errorReceiving = true;
                 break;
             }
         }
 
-        if(offset != 0){
 
-            if(pingPongThread.joinable()) pingPongThread.join();
-            std::swap(currentTemp, currentSend);
-            pingPongThread = std::thread([this, currentSend, offset, message_size]{
-                if(chunk_message_cb != nullptr){
-                    chunk_message_cb((char*)currentSend, offset, message_size);
-                }
-            });
+        if(!errorReceiving){
+            if(offset != 0){
+                if(pingPongThread.joinable()) pingPongThread.join();
+                std::swap(currentTemp, currentSend);
+                pingPongThread = std::thread([this, currentSend, offset, message_size]{
+                    if(chunk_message_cb != nullptr){
+                        chunk_message_cb((char*)currentSend, offset, message_size);
+                    }
+                });
 
-            offset = 0;
-        }
-
-        if(pingPongThread.joinable()) pingPongThread.join();
-
-        if(error_count > 0){
+                offset = 0;
+            }
+        } else {
             printf("Error receiving message\n");
-            return false;
+            req_success = 0;
         }
 
+        // At the end join ping pong thread if possible
+        if(pingPongThread.joinable()) pingPongThread.join();
     }
 
     return req_success;
