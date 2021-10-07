@@ -915,6 +915,7 @@ bool SpiApi::chunk_message_buffer(const char* stream_name, uint8_t* buffer, size
         if(pingPongThread.joinable()) pingPongThread.join();
 
         if(error_count > 0){
+            printf("Error receiving message\n");
             return false;
         }
 
