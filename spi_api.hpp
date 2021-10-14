@@ -16,6 +16,7 @@
 #include "depthai-shared/datatype/RawTracklets.hpp"
 
 namespace dai {
+// namespace spi {
 
 static const char* NOSTREAM = "";
 
@@ -41,14 +42,16 @@ class SpiApi {
     private:
         uint8_t (*send_spi_impl)(const char* spi_send_packet);
         uint8_t (*recv_spi_impl)(char* recvbuf);
+        uint8_t (*spi_transfer_impl)(const void*, size_t, void*, size_t);
 
-        void (*chunk_message_cb)(char* curr_packet, uint32_t chunk_size, uint32_t message_size);
+        void (*chunk_message_cb)(void* curr_packet, uint32_t chunk_size, uint32_t message_size);
 
         SpiProtocolInstance* spi_proto_instance;
         SpiProtocolPacket* spi_send_packet;
 
         uint8_t generic_send_spi(const char* spi_send_packet);
         uint8_t generic_recv_spi(char* recvbuf);
+        uint8_t generic_spi_transfer(const void* send_buffer, size_t send_size, void* receive_buffer, size_t receive_size);
 
         void transfer(const void* buffer, int size);
         void transfer2(const void* buffer1, const void* buffer2, int size1, int size2);
@@ -67,6 +70,7 @@ class SpiApi {
         // refs to callbacks
         void set_send_spi_impl(uint8_t (*passed_send_spi)(const char*));
         void set_recv_spi_impl(uint8_t (*passed_recv_spi)(char*));
+        void set_spi_transfer_impl(uint8_t (*transfer_impl)(const void*, size_t, void*, size_t));
 
         // base SPI API methods
         std::vector<std::string> spi_get_streams();
@@ -95,8 +99,9 @@ class SpiApi {
         }
 
         // methods for receiving a large message piece by piece
-        void chunk_message(const char* stream_name);
-        void set_chunk_packet_cb(void (*passed_chunk_message_cb)(char*, uint32_t, uint32_t));
+        bool chunk_message(const char* stream_name);
+        void set_chunk_packet_cb(void (*passed_chunk_message_cb)(void*, uint32_t, uint32_t));
+        bool chunk_message_buffer(const char* stream_name, uint8_t* buffer, size_t size);
 
         // Sending
         bool send_message(const std::shared_ptr<RawBuffer>& sp_msg, const char* stream_name);
@@ -107,6 +112,7 @@ class SpiApi {
 
 
 
+// }  // namespace spi
 }  // namespace dai
 
 #endif
