@@ -88,14 +88,13 @@ class SpiApi {
         // High level message functions
         // Receiving
         template<typename MSG>
-        void parse_message(const uint8_t* meta_pointer, int meta_length, MSG& obj){
-            nlohmann::json jser = nlohmann::json::from_msgpack(meta_pointer, meta_pointer + (meta_length));
-            nlohmann::from_json(jser, obj);
+        bool parse_message(const uint8_t* meta_pointer, int meta_length, MSG& obj){
+            return dai::utility::deserialize(meta_pointer, meta_length, obj);
         }
 
         template<typename MSG>
-        void parse_metadata(Metadata *passed_metadata, MSG& parsed_return){
-            parse_message(passed_metadata->data, passed_metadata->size, parsed_return);
+        bool parse_metadata(Metadata *passed_metadata, MSG& parsed_return){
+            return parse_message(passed_metadata->data, passed_metadata->size, parsed_return);
         }
 
         // methods for receiving a large message piece by piece
