@@ -16,6 +16,18 @@ start and end are constant bytes to mark the beginning and end of packets.
 static const uint8_t START_BYTE_MAGIC = 0b10101010;
 static const uint8_t END_BYTE_MAGIC = 0b00000000;
 ```
+
+### SPI implementation
+
+When implementing SPI communication between OAK SOM and another device, make sure to follow the notes below. Reference implementation (for ESP32) can [be found here](common/esp32_spi_impl.c).
+
+- Mode should be SPI Mode 1
+- CS should be enabled pre and post transaction for a couple extra cycles
+- Clock speed 4MHz works more reliably than higher.
+- On MX side, the interrupt pin is set to `MXIO34` (On ref implementation with ESP32 that pin is connected to ESP32 GPIO2)
+- `GET_SIZE` should return the size of the message buffer and `GET_METASIZE` the size of the accompanying metadata. Unless you receive `0xFFFFFFFF` (uint32_t), which indicates "no message"
+
+
 ## SPI Messaging
 On top of this we have a layer called SPI messaging. This code defines the following:
 * A list of a supported commands,
